@@ -34,12 +34,36 @@ async function run() {
     const classesCollection = client.db("tranquilHavenDb").collection("classes");
     const cartCollection = client.db("tranquilHavenDb").collection("carts");
 
+    app.post('/jwt', (req, res) => {
+      const user = req.body;
+      const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '1h' })
 
-    // User related API
-    app.get('/users', async(req, res) => {
+      res.send({ token })
+    })
+
+    const verifyAdmin = async (req, res, next) => {
+      const email = req.decoded.email;
+      const query = { email: email }
+      const user = await usersCollection.findOne(query);
+      if (user?.role !== 'admin') {
+        return res.status(403).send({ error: true, message: 'forbidden message' });
+      }
+      next();
+    }
+
+
+    // users related API
+    app.get('/users', verifyJWT, verifyAdmin, async (req, res) => {
       const result = await usersCollection.find().toArray();
       res.send(result);
-    })
+    });
+
+
+    // User related API
+    // app.get('/users', async(req, res) => {
+    //   const result = await usersCollection.find().toArray();
+    //   res.send(result);
+    // })
 
     app.post('/users', async(req,res) => {
       const user = req.body;
@@ -51,6 +75,19 @@ async function run() {
         return res.send({message: 'user already exists'})
       }
       const result = await usersCollection.insertOne(user);
+      res.send(result);
+    })
+
+    app.get('/users/admin/:email', verifyJWT, async (req, res) => {
+      const email = req.params.email;
+
+      if (req.decoded.email !== email) {
+        res.send({ admin: false })
+      }
+
+      const query = { email: email }
+      const user = await usersCollection.findOne(query);
+      const result = { admin: user?.role === 'admin' }
       res.send(result);
     })
 
@@ -83,11 +120,17 @@ async function run() {
     })
 
     // Cart collection process
-    app.get('/carts',async(req,res) => {
+    app.get('/carts', verifyJWT, async(req,res) => {
       const email = req.query.email;
       if(!email){
         res.send([]);
       }
+
+      const decodedEmail = req.decoded.email;
+      if (email !== decodedEmail) {
+        return res.status(403).send({ error: true, message: 'porviden access' })
+      }
+      
       const query = {email: email};
       const result = await cartCollection.find(query).toArray();
       res.send(result);
