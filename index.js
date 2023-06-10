@@ -29,10 +29,27 @@ async function run() {
     // Connect the client to the server	(optional starting in v4.7)
     await client.connect();
     const instructorCollection = client.db("tranquilHavenDb").collection("instructors");
+    const classesCollection = client.db("tranquilHavenDb").collection("classes");
+    const cartCollection = client.db("tranquilHavenDb").collection("carts");
+
 
     app.get('/instructors' , async(req,res) => {
       const result = await instructorCollection.find().toArray();
       res.send(result);
+    })
+
+    app.get('/classes' , async(req,res) => {
+      const result = await classesCollection.find().toArray();
+      res.send(result);
+    })
+
+    // Cart collection process
+
+    app.post('/carts', async(req, res) =>{
+        const course = req.body;
+        console.log(course);
+        const result = await cartCollection.insertOne(course);
+        res.send(result);
     })
 
 
