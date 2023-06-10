@@ -28,16 +28,26 @@ async function run() {
   try {
     // Connect the client to the server	(optional starting in v4.7)
     await client.connect();
+    const usersCollection = client.db("tranquilHavenDb").collection("users");
     const instructorCollection = client.db("tranquilHavenDb").collection("instructors");
     const classesCollection = client.db("tranquilHavenDb").collection("classes");
     const cartCollection = client.db("tranquilHavenDb").collection("carts");
 
 
+    // User related API
+    app.post('/users', async(req,res) => {
+      const user = req.body;
+      const result = await usersCollection.insertOne(user);
+      res.send(result);
+    })
+
+    // instructor related API
     app.get('/instructors' , async(req,res) => {
       const result = await instructorCollection.find().toArray();
       res.send(result);
     })
 
+    // class related API
     app.get('/classes' , async(req,res) => {
       const result = await classesCollection.find().toArray();
       res.send(result);
