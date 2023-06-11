@@ -3,6 +3,7 @@ const app = express();
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
 require('dotenv').config()
+const stripe = require('stripe')(process.env.PAYMENT_SECRET_KEY)
 const port = process.env.PORT || 5000;
 
 // middleware
@@ -49,6 +50,7 @@ async function run() {
     const instructorCollection = client.db("tranquilHavenDb").collection("instructors");
     const classesCollection = client.db("tranquilHavenDb").collection("classes");
     const cartCollection = client.db("tranquilHavenDb").collection("carts");
+    const paymentCollection = client.db("tranquilHavenDb").collection("payments");
 
     app.post('/jwt', (req, res) => {
       const user = req.body;
@@ -235,6 +237,47 @@ async function run() {
       const query = {_id: new ObjectId(id)};
       const result = await cartCollection.deleteOne(query);
       res.send(result);
+    })
+
+    // create payment intent
+    app.post('/create-payment-intent', verifyJWT, async (req, res) => {
+      const { price } = req.body;
+      const amount = parseInt(price * 100);
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: amount,
+        currency: 'usd',
+        payment_method_types: ['card']
+      });
+
+      res.send({
+        clientSecret: paymentIntent.client_secret
+      })
+    })
+
+    app.post('/payments', verifyJWT, async (req, res) => {
+      const payment = req.body;
+      const insertResult = await paymentCollection.insertOne(payment);
+
+      const query = { _id: { $in: payment.cartItems.map(id => new ObjectId(id)) } }
+      const deleteResult = await cartCollection.deleteMany(query)
+
+      res.send({ insertResult, deleteResult });
+    })
+
+    app.get('/admin-stats', verifyJWT, verifyAdmin, async (req, res) => {
+      const users = await usersCollection.estimatedDocumentCount();
+      const classes = await classesCollection.estimatedDocumentCount();
+      const orders = await paymentCollection.estimatedDocumentCount();
+
+      const payments = await paymentCollection.find().toArray();
+      const revenue = payments.reduce( ( sum, payment) => sum + payment.price, 0)
+
+      res.send({
+        revenue,
+        users,
+        classes,
+        orders
+      })
     })
 
 
